@@ -57,6 +57,8 @@
   button.danger { color: #a12; border-color: #e2b3b8; }
   button.danger:hover { background: #fbeaec; }
 
+  #tablehead { overflow: hidden; padding: 0 16px; background: #e3e9f1; }
+  #tablehead table { border-collapse: collapse; }
   #content { flex: 1 1 auto; overflow: auto; padding: 0 16px 16px; }
 
   table { border-collapse: collapse; width: 100%; background: #fff; }
@@ -432,21 +434,29 @@ function render() {
 
   var total = 0; for (var ci=0; ci<COLDEF.length; ci++) total += COLDEF[ci].w;
 
-  var h = [];
-  h.push('<table style="table-layout:fixed;width:'+total+'px">');
-  h.push('<colgroup>');
-  for (var ci2=0; ci2<COLDEF.length; ci2++) h.push('<col id="col_'+ci2+'" style="width:'+COLDEF[ci2].w+'px" />');
-  h.push('</colgroup>');
-  h.push('<thead><tr>');
+  // Kopf-Tabelle (separat, fix oben) ---------------------------------
+  var hh = [];
+  hh.push('<table style="table-layout:fixed;width:'+total+'px">');
+  hh.push('<colgroup>');
+  for (var ci2=0; ci2<COLDEF.length; ci2++) hh.push('<col id="hcol_'+ci2+'" style="width:'+COLDEF[ci2].w+'px" />');
+  hh.push('</colgroup><thead><tr>');
   for (var ci3=0; ci3<COLDEF.length; ci3++) {
     var cd = COLDEF[ci3];
     var al = cd.r ? ' style="text-align:right"' : '';
     var oc = cd.s ? ' onclick="setSort(\''+cd.s+'\')"' : '';
     var ar = cd.s ? (' '+arrow(cd.s)) : '';
-    h.push('<th'+al+oc+'>'+cd.t+ar+
+    hh.push('<th'+al+oc+'>'+cd.t+ar+
            '<span class="resizer" onmousedown="startResize(event,'+ci3+')" onclick="stopClick(event)">&nbsp;</span></th>');
   }
-  h.push('</tr></thead><tbody>');
+  hh.push('</tr></thead></table>');
+  byId("tablehead").innerHTML = hh.join("");
+
+  // Body-Tabelle (scrollt) -------------------------------------------
+  var h = [];
+  h.push('<table style="table-layout:fixed;width:'+total+'px">');
+  h.push('<colgroup>');
+  for (var ci4=0; ci4<COLDEF.length; ci4++) h.push('<col id="col_'+ci4+'" style="width:'+COLDEF[ci4].w+'px" />');
+  h.push('</colgroup><tbody>');
 
   if (!list.length) h.push('<tr><td colspan="'+COLDEF.length+'" class="muted" style="padding:20px;text-align:center">Keine Treffer.</td></tr>');
 
@@ -505,7 +515,8 @@ function render() {
 
   byId("stat").innerHTML = list.length + " von " + parts.length + " Teilen angezeigt &middot; " +
     '<span style="color:#b64a10;font-weight:600">' + warnCount + " unter Grenzwert</span> &middot; Datei: " + htmlEnc(dataPath());
-  stickHeader();
+  fitColumns();
+  syncScroll();
 }
 
 function setSort(k) { if (sortKey == k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = true; } render(); }
@@ -745,11 +756,8 @@ function onResizeMove(e) {
   var w = rz.startW + (e.clientX - rz.startX);
   if (w < 30) w = 30;
   COLDEF[rz.idx].w = w;
-  var col = byId("col_"+rz.idx);
-  if (col) col.style.width = w + "px";
-  var total = 0; for (var i=0;i<COLDEF.length;i++) total += COLDEF[i].w;
-  var tbl = byId("content").getElementsByTagName("table")[0];
-  if (tbl) tbl.style.width = total + "px";
+  setColW(rz.idx, w);
+  fitColumns();
   return false;
 }
 function endResize() {
@@ -796,15 +804,40 @@ function showLog() {
 function closeLog() { byId("logOverlay").style.display = "none"; }
 function refreshLog() { showLog(); }
 
-// Kopfzeile anheften (IE-Engine kennt kein position:sticky -> per Scroll nachführen)
-function stickHeader() {
-  var c = byId("content");
-  var ths = c.getElementsByTagName("th");
-  var t = c.scrollTop;
-  for (var i = 0; i < ths.length; i++) ths[i].style.top = t + "px";
+// Spaltenbreite in Kopf- UND Body-Tabelle setzen
+function setColW(idx, w) {
+  var a = byId("col_"+idx);  if (a) a.style.width = w + "px";
+  var b = byId("hcol_"+idx); if (b) b.style.width = w + "px";
+}
+function setTblW(w) {
+  var c = byId("content"), th = byId("tablehead");
+  var tb = c ? c.getElementsByTagName("table")[0] : null;
+  var hb = th ? th.getElementsByTagName("table")[0] : null;
+  if (tb) tb.style.width = w + "px";
+  if (hb) hb.style.width = w + "px";
 }
 
-function init() { loadWidths(); loadData(); render(); byId("q").focus(); }
+// Spalten automatisch auf volle Breite ziehen (Ueberschuss -> Bezeichnung)
+function fitColumns() {
+  var c = byId("content"); if (!c) return;
+  var avail = c.clientWidth - 2;
+  var sum = 0, fi = -1;
+  for (var i=0;i<COLDEF.length;i++){ sum += COLDEF[i].w; if (COLDEF[i].k=="bezeichnung") fi=i; }
+  if (fi < 0) return;
+  if (avail > sum) { setColW(fi, COLDEF[fi].w + (avail - sum)); setTblW(avail); }
+  else            { setColW(fi, COLDEF[fi].w);                  setTblW(sum); }
+}
+
+// horizontales Scrollen des Body auf die Kopfzeile spiegeln
+function syncScroll() {
+  var c = byId("content"), th = byId("tablehead");
+  if (c && th) th.scrollLeft = c.scrollLeft;
+}
+
+function init() {
+  loadWidths(); loadData(); render(); byId("q").focus();
+  window.onresize = fitColumns;
+}
 </script>
 </head>
 
@@ -835,7 +868,8 @@ function init() { loadWidths(); loadData(); render(); byId("q").focus(); }
     <button onclick="byId('q').value='';byId('fStatus').value='';byId('fWarn').checked=false;byId('fHidden').checked=false;byId('fIncomplete').checked=false;render();byId('q').focus();">Zur&uuml;cksetzen</button>
   </div>
 
-  <div id="content" onscroll="stickHeader()"></div>
+  <div id="tablehead"></div>
+  <div id="content" onscroll="syncScroll()"></div>
   <footer><span id="stat"></span></footer>
 </div>
 
