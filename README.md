@@ -1,55 +1,66 @@
 # Ersatzteildatenbank (HTA)
 
 Eine eigenständige Windows-Desktop-App (HTA / HTML Application) zur Verwaltung von
-Ersatzteilen. Keine Installation nötig – einfach `Ersatzteildatenbank.hta` per
-Doppelklick öffnen (läuft über `mshta.exe`, ist auf jedem Windows vorinstalliert).
+Ersatzteilen. Keine Installation nötig – `Ersatzteildatenbank.hta` per Doppelklick
+öffnen (läuft über `mshta.exe`, auf jedem Windows vorinstalliert).
 
 ## Funktionen
 
-- **Einbuchen** (`+ Ein`): Menge zum Bestand hinzufügen.
-- **Ausbuchen** (`- Aus`): Menge vom Bestand abziehen. Fällt der Bestand dabei
-  **unter den Grenzwert (Mindestbestand)**, erscheint sofort eine **Warnung**
-  (inkl. Hinweis auf den Nachfolger, falls hinterlegt).
-- **Warnung unter Grenzwert**: Betroffene Zeilen sind orange markiert, der Zähler
-  in der Fußzeile zeigt, wie viele Teile unter dem Grenzwert liegen. Filter
-  „nur Warnungen" blendet nur diese ein.
-- **Status auf „Bestellt"**: Button `Best.` schaltet den Status um. Beim Einbuchen
-  über den Grenzwert wird „Bestellt" automatisch wieder auf „Vorhanden" gesetzt.
-- **Nachfolger** (wie in der Excel): Artikelnummer des Nachfolge-Teils; ist das
-  Teil angelegt, ist der Eintrag anklickbar und springt dorthin.
-- **Schlagwortsuche + Artikelnummer-Suche**: Ein Suchfeld durchsucht
-  Artikelnummer, Bezeichnung, Schlagworte, Bauteil, Lagerort, Hersteller und
-  Nachfolger. Mehrere Begriffe (durch Leerzeichen getrennt) werden UND-verknüpft.
-- **Bauteil / Zuordnung**: Feld für die Zuordnung Teil → Bauteil. Kann später
-  über CSV-Import oder direkt in der App ergänzt werden.
-- Sortierung per Klick auf die Spaltenüberschrift, CSV-Export/-Import.
+- **Einbuchen** (`+ Ein`) / **Ausbuchen** (`- Aus`): Menge auf die **IstMenge**
+  buchen. Fällt die IstMenge beim Ausbuchen **unter die MinMenge (Grenzwert)**,
+  erscheint sofort eine **Warnung** und es kann direkt auf „Bestellt" gesetzt
+  werden (inkl. Hinweis auf den Nachfolger).
+- **Warnung unter Grenzwert**: betroffene Zeilen orange, Zähler in der Fußzeile,
+  Filter „nur Warnungen".
+- **Status „Bestellt"**: Button `Best.` schaltet um. Beim Einbuchen über die
+  MinMenge wird „Bestellt" automatisch zurückgesetzt.
+- **Nachfolger** (wie in der Excel): Artikel-Nr. des Nachfolge-Teils; ist es
+  angelegt, ist der Eintrag anklickbar und springt dorthin.
+- **Schlagwort- & Artikelnummer-Suche**: ein Suchfeld über Artikelnummer,
+  Erweiterte Art.Nr, Bezeichnung, Schlagworte, Bauteilgruppe, Bin, Hersteller,
+  Nachfolger und Position/Typ. Mehrere Begriffe = UND-verknüpft.
+- Sortierung per Spaltenklick, CSV-Export/-Import.
+
+## Datenmodell (an die Excel „Ersatzteilmatrix" angelehnt)
+
+| Excel-Spalte        | Bedeutung in der App                     |
+|---------------------|------------------------------------------|
+| Position            | Positionsnummer (Anzeige/Sortierung)     |
+| Menge               | **Empfohlene Menge**                      |
+| Artikelnummer       | Artikelnummer (Suche, Duplikatprüfung)   |
+| Erweiterte Art.Nr   | zusätzliche/erweiterte Artikelnummer     |
+| Nachfolger          | Artikel-Nr. des Nachfolge-Teils          |
+| Artikelbezeichnung  | Bezeichnung                              |
+| Bin                 | Lagerort / Fach                          |
+| Position/Typ        | Position bzw. Typ                        |
+| IstMenge            | **Bestand** (Ein-/Ausbuchen)             |
+| MinMenge            | **Grenzwert** für die Warnung            |
+| UnterMinMeng        | wird von der App berechnet (IstMenge ≤ MinMenge) |
+| Bestellt            | Status „Bestellt" (1/ja/x = ja)          |
+| Bauteilgruppe       | Zuordnung Teil → Baugruppe               |
+| Hersteller          | Hersteller                              |
+| Schlagworte         | zusätzliche Suchbegriffe (optional)      |
+| Bemerkung           | Freitext (optional)                      |
 
 ## Daten
 
-Die Daten werden in `ersatzteile.json` **im selben Ordner** wie die HTA-Datei
-gespeichert (UTF-8). Beim ersten Start wird ein Beispiel-Datensatz angelegt –
-diesen einfach löschen.
+Gespeichert in `ersatzteile.json` **im selben Ordner** wie die HTA (UTF-8).
 
-## Import der bestehenden Excel-Daten
+## Excel-Import
 
-1. In Excel die relevanten Spalten in ein Tabellenblatt bringen mit **Kopfzeile**
-   und diesen Feldnamen (Reihenfolge egal, nur passende Spalten werden übernommen):
+1. In Excel das Blatt so aufbauen, dass die **Kopfzeile** die obigen Spaltennamen
+   enthält (Reihenfolge egal, unbekannte Spalten werden ignoriert). Vorlage:
+   `import_vorlage.csv`.
+2. Als **CSV (Trennzeichen Semikolon)** speichern, z. B. `import.csv` im Ordner
+   der HTA. `Bestellt`: `1`, `ja` oder `x` = bestellt.
+3. In der App **CSV Import** klicken, Pfad bestätigen.
+   Vorhandene Artikelnummern werden aktualisiert, neue angelegt.
 
-   ```
-   artikelnummer;bezeichnung;schlagworte;bauteil;lagerort;bestand;mindestbestand;status;nachfolger;hersteller;bemerkung
-   ```
-
-2. Als **CSV (Trennzeichen Semikolon)** speichern, z. B. `import.csv` in den
-   Ordner der HTA.
-3. In der App **CSV Import** klicken und den Pfad bestätigen.
-   - Vorhandene Artikelnummern werden aktualisiert, neue angelegt.
-
-> Sobald du mir die Excel-Spalten / die Zuordnung Teile→Bauteile lieferst, passe
-> ich die Feldnamen bzw. eine fertige Import-Vorlage genau an deine Datei an.
+> Die Zuordnung Teile → Baugruppen läuft über die Spalte **Bauteilgruppe** –
+> einfach in der Excel bzw. beim Import mitgeben, oder später in der App ergänzen.
 
 ## Hinweise
 
-- Falls Windows beim Start des `ADODB.Stream`/`FileSystemObject` nachfragt: mit
-  „Ja/Zulassen" bestätigen (HTAs laufen mit lokalen Rechten).
-- Die App ist bewusst als **eine einzige Datei** gehalten, damit sie sich leicht
-  per Netzlaufwerk oder USB weitergeben lässt.
+- Falls Windows beim ersten `ADODB.Stream`/`FileSystemObject`-Zugriff nachfragt:
+  „Ja/Zulassen".
+- Bewusst als **eine Datei** gehalten (leicht per Netzlaufwerk/USB weiterzugeben).
