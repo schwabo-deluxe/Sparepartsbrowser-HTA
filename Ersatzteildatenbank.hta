@@ -67,7 +67,16 @@
     cursor: pointer; white-space: nowrap;
   }
   thead th .arrow { color: #7a8794; font-size: 10px; }
-  tbody td { padding: 6px 8px; border-bottom: 1px solid #e6eaf0; vertical-align: top; }
+  tbody td { padding: 6px 8px; border-bottom: 1px solid #e6eaf0; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; }
+  .resizer {
+    position: absolute; top: 0; right: 0; width: 6px; height: 100%;
+    cursor: col-resize; z-index: 6; background: transparent;
+  }
+  .resizer:hover { background: #a9c4e6; }
+  .platzwrap { margin-top: 3px; }
+  .platztog { color: #2f6fbf; cursor: pointer; font-size: 11px; font-weight: 600; }
+  .platztog:hover { text-decoration: underline; }
+  .platzlist { display: none; margin-top: 2px; color: #52606d; font-size: 11px; line-height: 1.5; }
   tbody tr:hover { background: #f3f7fd; }
   tbody tr.warn { background: #fff4e5; }
   tbody tr.warn:hover { background: #ffedd4; }
@@ -168,6 +177,36 @@ var COLMAP = [
   { key:"geaendert",     xls:"Geaendert" }
 ];
 
+// ---- Spaltendefinition (mit speicherbaren Breiten) ----
+var COLDEF = [
+  { k:"position",      t:"Pos.",          s:"position",      w:55 },
+  { k:"artikelnummer", t:"Artikel-Nr.",   s:"artikelnummer", w:150 },
+  { k:"erwArtNr",      t:"Erw. Art.Nr",   s:"erwArtNr",      w:130 },
+  { k:"bezeichnung",   t:"Bezeichnung",   s:"bezeichnung",   w:300 },
+  { k:"bauteilgruppe", t:"Bauteilgruppe", s:"bauteilgruppe", w:120 },
+  { k:"bin",           t:"Bin",           s:"bin",           w:90 },
+  { k:"istMenge",      t:"IstMenge",      s:"istMenge",      w:80, r:true },
+  { k:"minMenge",      t:"MinMenge",      s:"minMenge",      w:80, r:true },
+  { k:"status",        t:"Status",        s:"bestellt",      w:80 },
+  { k:"nachfolger",    t:"Nachfolger",    s:"nachfolger",    w:120 },
+  { k:"actions",       t:"Aktionen",      s:null,            w:290 }
+];
+function viewPath() { return scriptDir() + "\\ansicht.json"; }
+function loadWidths() {
+  try {
+    var raw = readFileUtf8(viewPath());
+    if (!trim(raw).length) return;
+    var arr = eval("(" + raw + ")");
+    for (var i=0;i<COLDEF.length && i<arr.length;i++) if (arr[i]>20) COLDEF[i].w = arr[i];
+  } catch (e) {}
+}
+function saveWidths() {
+  try {
+    var a = []; for (var i=0;i<COLDEF.length;i++) a.push(COLDEF[i].w);
+    writeFileUtf8(viewPath(), "[" + a.join(",") + "]");
+  } catch (e) {}
+}
+
 // ---- Persistenz via ADODB.Stream (UTF-8) ----
 function scriptDir() {
   var fso = new ActiveXObject("Scripting.FileSystemObject");
@@ -232,7 +271,12 @@ function jsonStringify(arr) {
 }
 
 // ---- Utils ----
-function trim(s) { return ("" + s).replace(/^\s+|\s+$/g, ""); }
+function trim(s) {
+  if (s == null) return "";
+  s = ("" + s).replace(/^\s+|\s+$/g, "");
+  if (s == "undefined" || s == "null") return "";
+  return s;
+}
 function byId(id) { return document.getElementById(id); }
 function num(v) { var n = parseInt(("" + v).replace(/[^\d\-]/g, ""), 10); return isNaN(n) ? 0 : n; }
 function nowStamp() {
@@ -380,21 +424,25 @@ function render() {
 
   function arrow(k) { return sortKey == k ? '<span class="arrow">' + (sortAsc ? "&#9650;" : "&#9660;") + '</span>' : ''; }
 
+  var total = 0; for (var ci=0; ci<COLDEF.length; ci++) total += COLDEF[ci].w;
+
   var h = [];
-  h.push('<table><thead><tr>');
-  h.push('<th onclick="setSort(\'position\')">Pos. '+arrow('position')+'</th>');
-  h.push('<th onclick="setSort(\'artikelnummer\')">Artikel-Nr. '+arrow('artikelnummer')+'</th>');
-  h.push('<th onclick="setSort(\'bezeichnung\')">Bezeichnung '+arrow('bezeichnung')+'</th>');
-  h.push('<th onclick="setSort(\'bauteilgruppe\')">Bauteilgruppe '+arrow('bauteilgruppe')+'</th>');
-  h.push('<th onclick="setSort(\'bin\')">Bin '+arrow('bin')+'</th>');
-  h.push('<th onclick="setSort(\'istMenge\')" style="text-align:right">IstMenge '+arrow('istMenge')+'</th>');
-  h.push('<th onclick="setSort(\'minMenge\')" style="text-align:right">MinMenge '+arrow('minMenge')+'</th>');
-  h.push('<th onclick="setSort(\'bestellt\')">Status '+arrow('bestellt')+'</th>');
-  h.push('<th onclick="setSort(\'nachfolger\')">Nachfolger '+arrow('nachfolger')+'</th>');
-  h.push('<th style="width:1%">Aktionen</th>');
+  h.push('<table style="table-layout:fixed;width:'+total+'px">');
+  h.push('<colgroup>');
+  for (var ci2=0; ci2<COLDEF.length; ci2++) h.push('<col id="col_'+ci2+'" style="width:'+COLDEF[ci2].w+'px" />');
+  h.push('</colgroup>');
+  h.push('<thead><tr>');
+  for (var ci3=0; ci3<COLDEF.length; ci3++) {
+    var cd = COLDEF[ci3];
+    var al = cd.r ? ' style="text-align:right"' : '';
+    var oc = cd.s ? ' onclick="setSort(\''+cd.s+'\')"' : '';
+    var ar = cd.s ? (' '+arrow(cd.s)) : '';
+    h.push('<th'+al+oc+'>'+cd.t+ar+
+           '<span class="resizer" onmousedown="startResize(event,'+ci3+')" onclick="stopClick(event)">&nbsp;</span></th>');
+  }
   h.push('</tr></thead><tbody>');
 
-  if (!list.length) h.push('<tr><td colspan="10" class="muted" style="padding:20px;text-align:center">Keine Treffer.</td></tr>');
+  if (!list.length) h.push('<tr><td colspan="'+COLDEF.length+'" class="muted" style="padding:20px;text-align:center">Keine Treffer.</td></tr>');
 
   for (var j = 0; j < list.length; j++) {
     var p = list[j];
@@ -404,12 +452,20 @@ function render() {
     if (p.ausgeblendet) rc.push("hidden");
 
     var sub = [];
-    if (trim(p.erwArtNr).length) sub.push("erw.: "+htmlEnc(p.erwArtNr));
     if (trim(p.hersteller).length) sub.push(htmlEnc(p.hersteller));
     if (trim(p.zuordnung).length) sub.push(htmlEnc(p.zuordnung));
-    if (trim(p.platz).length) sub.push("Platz: "+htmlEnc(p.platz));
     var subHtml = sub.length ? '<div class="sub">'+sub.join(" &middot; ")+'</div>' : '';
-    var kw = p.schlagworte ? '<div class="kw">'+htmlEnc(p.schlagworte)+'</div>' : '';
+    var kw = trim(p.schlagworte).length ? '<div class="kw">'+htmlEnc(p.schlagworte)+'</div>' : '';
+
+    var platzHtml = "";
+    if (trim(p.platz).length) {
+      var pl = p.platz.split(/;\s*/);
+      var cnt = 0; for (var pi=0; pi<pl.length; pi++) if (trim(pl[pi]).length) cnt++;
+      platzHtml = '<div class="platzwrap">'
+        + '<span class="platztog" id="ptog_'+p.id+'" onclick="togglePlatz(\''+p.id+'\')">&#43; Platz ('+cnt+')</span>'
+        + '<div class="platzlist" id="plist_'+p.id+'">'+htmlEnc(p.platz)+'</div>'
+        + '</div>';
+    }
 
     var nf = "";
     if (trim(p.nachfolger).length) {
@@ -420,7 +476,8 @@ function render() {
 
     h.push('<tr class="'+rc.join(" ")+'" id="row_'+p.id+'">');
     h.push('<td>'+htmlEnc(p.position)+'</td>');
-    h.push('<td><strong>'+htmlEnc(p.artikelnummer)+'</strong>'+subHtml+'</td>');
+    h.push('<td><strong>'+htmlEnc(p.artikelnummer)+'</strong>'+subHtml+platzHtml+'</td>');
+    h.push('<td>'+htmlEnc(p.erwArtNr)+'</td>');
     h.push('<td>'+htmlEnc(p.bezeichnung)+kw+'</td>');
     h.push('<td>'+htmlEnc(p.bauteilgruppe)+'</td>');
     h.push('<td>'+htmlEnc(p.bin)+'</td>');
@@ -643,6 +700,46 @@ function splitCsv(line, sep) {
 
 function onSearchKey() { render(); }
 
+// Platz-Liste ein-/ausklappen
+function togglePlatz(id) {
+  var d = byId("plist_"+id), a = byId("ptog_"+id);
+  if (!d || !a) return;
+  if (d.style.display == "block") { d.style.display = "none"; a.innerHTML = a.innerHTML.replace("− Platz", "+ Platz"); }
+  else { d.style.display = "block"; a.innerHTML = a.innerHTML.replace("+ Platz", "− Platz"); }
+}
+
+// Spaltenbreite per Ziehen ändern
+var rz = null;
+function stopClick(e) { e = e || window.event; if (e.stopPropagation) e.stopPropagation(); e.cancelBubble = true; }
+function startResize(e, idx) {
+  e = e || window.event;
+  if (e.stopPropagation) e.stopPropagation(); e.cancelBubble = true;
+  if (e.preventDefault) e.preventDefault();
+  rz = { idx: idx, startX: e.clientX, startW: COLDEF[idx].w };
+  if (document.attachEvent) { document.attachEvent("onmousemove", onResizeMove); document.attachEvent("onmouseup", endResize); }
+  else { document.onmousemove = onResizeMove; document.onmouseup = endResize; }
+}
+function onResizeMove(e) {
+  if (!rz) return;
+  e = e || window.event;
+  var w = rz.startW + (e.clientX - rz.startX);
+  if (w < 30) w = 30;
+  COLDEF[rz.idx].w = w;
+  var col = byId("col_"+rz.idx);
+  if (col) col.style.width = w + "px";
+  var total = 0; for (var i=0;i<COLDEF.length;i++) total += COLDEF[i].w;
+  var tbl = byId("content").getElementsByTagName("table")[0];
+  if (tbl) tbl.style.width = total + "px";
+  return false;
+}
+function endResize() {
+  if (!rz) return;
+  rz = null;
+  if (document.detachEvent) { document.detachEvent("onmousemove", onResizeMove); document.detachEvent("onmouseup", endResize); }
+  else { document.onmousemove = null; document.onmouseup = null; }
+  saveWidths();
+}
+
 // ---- Protokoll-Ansicht ----
 function showLog() {
   var raw = readFileUtf8(logPath());
@@ -687,7 +784,7 @@ function stickHeader() {
   for (var i = 0; i < ths.length; i++) ths[i].style.top = t + "px";
 }
 
-function init() { loadData(); render(); byId("q").focus(); }
+function init() { loadWidths(); loadData(); render(); byId("q").focus(); }
 </script>
 </head>
 

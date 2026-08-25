@@ -36,6 +36,11 @@ Ersatzteilen. Keine Installation nötig – `Ersatzteildatenbank.hta` per Doppel
   Bestellt-Umschalten bleiben ohne Passwort möglich. Button oben rechts
   entsperrt/sperrt die Sitzung.
 - **Angeheftete Kopfzeile**: die Spaltenüberschriften bleiben beim Scrollen oben.
+- **Spaltenbreiten änderbar**: am rechten Rand einer Spaltenüberschrift ziehen;
+  die Breiten werden in `ansicht.json` gespeichert. „Erweiterte Art.Nr" ist eine
+  eigene Spalte.
+- Die **Platz**-Liste ist pro Teil eingeklappt und lässt sich über „+ Platz (n)"
+  aufklappen.
 - **Buchungsprotokoll (Audit-Trail)**: jede Ein-/Ausbuchung wird in
   `buchungen_log.csv` (neben der HTA) protokolliert – mit Zeitpunkt, Aktion,
   Artikelnummer, Bezeichnung, Menge, Bestand vorher/nachher und Windows-Benutzer.
