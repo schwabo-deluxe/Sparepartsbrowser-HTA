@@ -161,6 +161,7 @@ var COLMAP = [
   { key:"bauteilgruppe", xls:"Bauteilgruppe" },
   { key:"hersteller",    xls:"Hersteller" },
   { key:"zuordnung",     xls:"Zuordnung" },
+  { key:"platz",         xls:"Platz" },
   { key:"schlagworte",   xls:"Schlagworte" },
   { key:"bemerkung",     xls:"Bemerkung" },
   { key:"ausgeblendet",  xls:"Ausgeblendet" },
@@ -273,6 +274,7 @@ function normalize(p) {
     bauteilgruppe: trim(p.bauteilgruppe),
     hersteller:    trim(p.hersteller),
     zuordnung:     trim(p.zuordnung),
+    platz:         trim(p.platz),
     schlagworte:   trim(p.schlagworte),
     bemerkung:     trim(p.bemerkung),
     ausgeblendet:  (typeof p.ausgeblendet == "boolean") ? p.ausgeblendet : truthy(p.ausgeblendet),
@@ -333,7 +335,7 @@ function currentFiltered() {
     if (onlyWarn && !isWarn(p)) continue;
     if (terms.length) {
       var hay = (p.artikelnummer+" "+p.erwArtNr+" "+p.bezeichnung+" "+p.schlagworte+" "+
-                 p.bauteilgruppe+" "+p.bin+" "+p.hersteller+" "+p.zuordnung+" "+p.nachfolger+" "+p.posTyp).toLowerCase();
+                 p.bauteilgruppe+" "+p.bin+" "+p.hersteller+" "+p.zuordnung+" "+p.platz+" "+p.nachfolger+" "+p.posTyp).toLowerCase();
       var ok = true;
       for (var t = 0; t < terms.length; t++) { if (hay.indexOf(terms[t]) < 0) { ok = false; break; } }
       if (!ok) continue;
@@ -405,6 +407,7 @@ function render() {
     if (trim(p.erwArtNr).length) sub.push("erw.: "+htmlEnc(p.erwArtNr));
     if (trim(p.hersteller).length) sub.push(htmlEnc(p.hersteller));
     if (trim(p.zuordnung).length) sub.push(htmlEnc(p.zuordnung));
+    if (trim(p.platz).length) sub.push("Platz: "+htmlEnc(p.platz));
     var subHtml = sub.length ? '<div class="sub">'+sub.join(" &middot; ")+'</div>' : '';
     var kw = p.schlagworte ? '<div class="kw">'+htmlEnc(p.schlagworte)+'</div>' : '';
 
@@ -507,7 +510,7 @@ function openNew() {
   if (!requireAuth()) return;
   editId = null;
   byId("mtitle").innerHTML = "Neues Teil anlegen";
-  var f = ["position","menge","artikelnummer","erwArtNr","nachfolger","bezeichnung","bin","posTyp","istMenge","minMenge","bauteilgruppe","hersteller","zuordnung","schlagworte","bemerkung"];
+  var f = ["position","menge","artikelnummer","erwArtNr","nachfolger","bezeichnung","bin","posTyp","istMenge","minMenge","bauteilgruppe","hersteller","zuordnung","platz","schlagworte","bemerkung"];
   for (var i=0;i<f.length;i++) setField("f_"+f[i], (f[i]=="menge"||f[i]=="istMenge"||f[i]=="minMenge")?"0":"");
   byId("f_bestellt").checked = false;
   byId("f_ausgeblendet").checked = false;
@@ -524,7 +527,7 @@ function openEdit(id) {
   setField("f_bin",p.bin); setField("f_posTyp",p.posTyp);
   setField("f_istMenge",p.istMenge); setField("f_minMenge",p.minMenge);
   setField("f_bauteilgruppe",p.bauteilgruppe); setField("f_hersteller",p.hersteller);
-  setField("f_zuordnung",p.zuordnung);
+  setField("f_zuordnung",p.zuordnung); setField("f_platz",p.platz);
   setField("f_schlagworte",p.schlagworte); setField("f_bemerkung",p.bemerkung);
   byId("f_bestellt").checked = p.bestellt;
   byId("f_ausgeblendet").checked = p.ausgeblendet;
@@ -556,6 +559,7 @@ function saveForm() {
   p.bauteilgruppe= trim(byId("f_bauteilgruppe").value);
   p.hersteller   = trim(byId("f_hersteller").value);
   p.zuordnung    = trim(byId("f_zuordnung").value);
+  p.platz        = trim(byId("f_platz").value);
   p.schlagworte  = trim(byId("f_schlagworte").value);
   p.bemerkung    = trim(byId("f_bemerkung").value);
   p.geaendert    = nowStamp();
@@ -731,6 +735,10 @@ function init() { loadData(); render(); byId("q").focus(); }
         <div class="field"><label>Erweiterte Art.Nr</label><input type="text" id="f_erwArtNr" /></div>
       </div>
       <div class="field"><label>Artikelbezeichnung</label><input type="text" id="f_bezeichnung" /></div>
+      <div class="field">
+        <label>Platz / Einbauort (z. B. DC30.1; mehrere mit ; trennen)</label>
+        <input type="text" id="f_platz" />
+      </div>
       <div class="field">
         <label>Schlagworte (Komma-getrennt, f&uuml;r die Suche)</label>
         <input type="text" id="f_schlagworte" />

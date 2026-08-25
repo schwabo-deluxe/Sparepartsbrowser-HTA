@@ -25,6 +25,11 @@ Ersatzteilen. Keine Installation nötig – `Ersatzteildatenbank.hta` per Doppel
   Nachfolger und Position/Typ. Mehrere Begriffe = UND-verknüpft.
 - **Zuordnung (Lieferant)**: eigenes Feld/Spalte `Zuordnung` (z. B. Kardex,
   Syncore, Mosca, Assa Abloy), durchsuchbar und unter der Artikel-Nr. sichtbar.
+- **Platz / Einbauort**: Feld/Spalte `Platz` (z. B. `DC30.1`), durchsuchbar –
+  man kann direkt nach einem Platz suchen. Kommt ein Teil an mehreren Plätzen
+  vor, stehen alle in der Zelle, mit `; ` getrennt (z. B. `DC30.1; DC30.2`).
+  Die Werte stammen aus dem Kardex-Ersatzteilkatalog (Einbauort je Förderer-
+  Abschnitt) und wurden über die Artikelnummer mit den Stammdaten verknüpft.
 - **Passwortschutz**: Bearbeiten, Löschen, Neu anlegen und CSV-Import sind
   passwortgeschützt. Das Passwort wird im HTA-Kopf gesetzt
   (`var ADMIN_PW = "1234";` – **bitte ändern**). Ein-/Ausbuchen und
