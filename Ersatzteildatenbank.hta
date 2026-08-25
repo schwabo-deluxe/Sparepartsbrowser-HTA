@@ -226,7 +226,7 @@ function truthy(v) {
 function normalize(p) {
   return {
     id:            p.id || newId(),
-    position:      num(p.position),
+    position:      trim(p.position),
     menge:         num(p.menge),
     artikelnummer: trim(p.artikelnummer),
     erwArtNr:      trim(p.erwArtNr),
@@ -440,7 +440,7 @@ function openNew() {
   editId = null;
   byId("mtitle").innerHTML = "Neues Teil anlegen";
   var f = ["position","menge","artikelnummer","erwArtNr","nachfolger","bezeichnung","bin","posTyp","istMenge","minMenge","bauteilgruppe","hersteller","schlagworte","bemerkung"];
-  for (var i=0;i<f.length;i++) setField("f_"+f[i], (f[i]=="position"||f[i]=="menge"||f[i]=="istMenge"||f[i]=="minMenge")?"0":"");
+  for (var i=0;i<f.length;i++) setField("f_"+f[i], (f[i]=="menge"||f[i]=="istMenge"||f[i]=="minMenge")?"0":"");
   byId("f_bestellt").checked = false;
   showModal(true);
 }
@@ -469,7 +469,7 @@ function saveForm() {
   if (dup && dup.id != editId) { if (!confirm("Artikelnummer existiert bereits. Trotzdem speichern?")) return; }
 
   var p = editId ? getPart(editId) : normalize({});
-  p.position     = num(byId("f_position").value);
+  p.position     = trim(byId("f_position").value);
   p.menge        = num(byId("f_menge").value);
   p.artikelnummer= an;
   p.erwArtNr     = trim(byId("f_erwArtNr").value);
@@ -598,7 +598,7 @@ function init() { loadData(); render(); byId("q").focus(); }
     <div class="mhead" id="mtitle">Teil</div>
     <div class="mbody">
       <div class="row3">
-        <div class="field"><label>Position</label><input type="number" id="f_position" /></div>
+        <div class="field"><label>Position</label><input type="text" id="f_position" /></div>
         <div class="field"><label>Empfohlene Menge</label><input type="number" id="f_menge" /></div>
         <div class="field"><label>Position/Typ</label><input type="text" id="f_posTyp" /></div>
       </div>
