@@ -368,26 +368,54 @@ function stockClass(p) {
   return "ok";
 }
 
-// Zehnergruppen-Tokens der Plaetze (DA40.1 -> "DA4"), fuer Bereichssuche
-function placeGroups(platz) {
-  if (!platz) return "";
-  var codes = ("" + platz).split(/;\s*/), out = [];
-  for (var i=0;i<codes.length;i++) {
-    var m = trim(codes[i]).match(/^([A-Za-z]{2,3})(\d{2})/);
-    if (m) { var g = m[1] + m[2].charAt(0); if (out.join(" ").indexOf(g) < 0) out.push(g); }
+// Alle vorhandenen Platz-Basiscodes (ohne Achse .x), z.B. "DA40"
+function placeBaseList() {
+  var seen = {}, out = [];
+  for (var i=0;i<parts.length;i++) {
+    var pl = parts[i].platz; if (!trim(pl).length) continue;
+    var codes = pl.split(/;\s*/);
+    for (var c=0;c<codes.length;c++) {
+      var base = trim(codes[c]).replace(/\..*$/, "").toUpperCase(); // Achse abschneiden
+      if (base.length && !seen[base]) { seen[base] = 1; out.push(base); }
+    }
   }
-  return out.join(" ");
+  out.sort();
+  return out;
+}
+// Levenshtein-Distanz, abgebrochen bei > max
+function editDist(a, b, max) {
+  a = a.toUpperCase(); b = b.toUpperCase();
+  var la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > max) return max + 1;
+  var prev = [], cur = [], i, j;
+  for (j=0;j<=lb;j++) prev[j] = j;
+  for (i=1;i<=la;i++) {
+    cur[0] = i; var best = cur[0];
+    for (j=1;j<=lb;j++) {
+      var cost = (a.charAt(i-1) == b.charAt(j-1)) ? 0 : 1;
+      var v = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost);
+      cur[j] = v; if (v < best) best = v;
+    }
+    if (best > max) return max + 1;
+    for (j=0;j<=lb;j++) prev[j] = cur[j];
+  }
+  return prev[lb];
+}
+// Vorschlaege fuer einen (Tipp-)Platzcode: Distanz <= 1 zu vorhandenen Basiscodes
+function placeSuggestions(token) {
+  token = trim(token);
+  if (token.length < 3 || !/^[a-zA-Z]/.test(token)) return [];
+  var bases = placeBaseList(), tU = token.toUpperCase(), out = [];
+  // exakt vorhanden? dann kein Vorschlag noetig
+  for (var i=0;i<bases.length;i++) if (bases[i] == tU) return [];
+  for (var k=0;k<bases.length;k++) if (editDist(tU, bases[k], 1) <= 1) out.push(bases[k]);
+  return out;
 }
 
 // ---- Filtern / Sortieren / Rendern ----
 function currentFiltered() {
   var q = trim(byId("q").value).toLowerCase();
   var terms = q.length ? q.split(/\s+/) : [];
-  // Platz-Basis wie "da40" -> Zehnergruppe "da4" (findet DA40..DA49)
-  for (var ti=0; ti<terms.length; ti++) {
-    var gm = terms[ti].match(/^([a-z]{2,3})(\d{2})$/);
-    if (gm) terms[ti] = gm[1] + gm[2].charAt(0);
-  }
   var stat = byId("fStatus").value;
   var onlyWarn = byId("fWarn").checked;
   var showHidden = byId("fHidden").checked;
@@ -404,7 +432,7 @@ function currentFiltered() {
     if (terms.length) {
       var hay = (p.artikelnummer+" "+p.erwArtNr+" "+p.bezeichnung+" "+p.schlagworte+" "+
                  p.bauteilgruppe+" "+p.bin+" "+p.hersteller+" "+p.zuordnung+" "+p.platz+" "+
-                 placeGroups(p.platz)+" "+p.nachfolger+" "+p.posTyp).toLowerCase();
+                 p.nachfolger+" "+p.posTyp).toLowerCase();
       var ok = true;
       for (var t = 0; t < terms.length; t++) { if (hay.indexOf(terms[t]) < 0) { ok = false; break; } }
       if (!ok) continue;
@@ -529,6 +557,25 @@ function render() {
   }
   h.push('</tbody></table>');
   byId("content").innerHTML = h.join("");
+
+  // Platz-Vorschlaege (Tippfehler-Toleranz, Distanz 1)
+  var sBox = byId("suggest");
+  if (list.length == 0) {
+    var qraw = trim(byId("q").value);
+    var toks = qraw.length ? qraw.split(/\s+/) : [];
+    var sHtml = [];
+    for (var st=0; st<toks.length; st++) {
+      var sug = placeSuggestions(toks[st]);
+      if (sug.length) {
+        var links = [];
+        for (var sk=0; sk<sug.length && sk<8; sk++)
+          links.push('<a class="link" onclick="setSearch(\''+sug[sk]+'\')">'+sug[sk]+'</a>');
+        sHtml.push('Meintest du bei <b>'+htmlEnc(toks[st])+'</b>: '+links.join(", "));
+      }
+    }
+    sBox.innerHTML = sHtml.join(" &middot; ");
+    sBox.style.display = sHtml.length ? "block" : "none";
+  } else { sBox.style.display = "none"; sBox.innerHTML = ""; }
 
   byId("stat").innerHTML = list.length + " von " + parts.length + " Teilen angezeigt &middot; " +
     '<span style="color:#b64a10;font-weight:600">' + warnCount + " unter Grenzwert</span> &middot; Datei: " + htmlEnc(dataPath());
@@ -747,6 +794,7 @@ function splitCsv(line, sep) {
 }
 
 function onSearchKey() { render(); }
+function setSearch(v) { byId("q").value = v; render(); byId("q").focus(); }
 
 // Platz-Liste ein-/ausklappen
 function togglePlatz(id) {
@@ -885,6 +933,7 @@ function init() {
     <button onclick="byId('q').value='';byId('fStatus').value='';byId('fWarn').checked=false;byId('fHidden').checked=false;byId('fIncomplete').checked=false;render();byId('q').focus();">Zur&uuml;cksetzen</button>
   </div>
 
+  <div id="suggest" style="display:none;padding:6px 16px;background:#fff4e5;border-bottom:1px solid #f4c580;font-size:12px;color:#7a4a10;"></div>
   <div id="tablehead"></div>
   <div id="content" onscroll="syncScroll()"></div>
   <footer><span id="stat"></span></footer>
