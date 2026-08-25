@@ -1,0 +1,621 @@
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Ersatzteildatenbank</title>
+<hta:application
+    id="EtdbApp"
+    applicationname="Ersatzteildatenbank"
+    border="thin"
+    caption="yes"
+    maximizebutton="yes"
+    minimizebutton="yes"
+    showintaskbar="yes"
+    scroll="no"
+    singleinstance="yes"
+    windowstate="maximize"
+/>
+<style type="text/css">
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%; margin: 0; padding: 0;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 13px; color: #1f2933; background: #eef1f5;
+  }
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  header {
+    background: #1f3a5f; color: #fff; padding: 10px 16px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  }
+  header h1 { font-size: 18px; margin: 0 16px 0 0; font-weight: 600; white-space: nowrap; }
+  header .grow { flex: 1 1 auto; }
+
+  .toolbar {
+    background: #f7f9fc; border-bottom: 1px solid #d5dae2;
+    padding: 8px 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  }
+  .toolbar label { font-size: 12px; color: #52606d; }
+
+  input[type=text], input[type=number], select, textarea {
+    font-family: inherit; font-size: 13px; padding: 5px 7px;
+    border: 1px solid #b8c1cc; border-radius: 4px; background: #fff; color: #1f2933;
+  }
+  input[type=text]:focus, input[type=number]:focus, select:focus, textarea:focus {
+    outline: none; border-color: #2f6fbf; box-shadow: 0 0 0 2px rgba(47,111,191,.2);
+  }
+  #q { min-width: 280px; }
+
+  button {
+    font-family: inherit; font-size: 13px; padding: 6px 12px; cursor: pointer;
+    border: 1px solid #b8c1cc; border-radius: 4px; background: #fff; color: #1f2933;
+  }
+  button:hover { background: #eef2f7; }
+  button.primary { background: #2f6fbf; border-color: #2f6fbf; color: #fff; }
+  button.primary:hover { background: #2860a6; }
+  button.small { padding: 3px 8px; font-size: 12px; }
+  button.danger { color: #a12; border-color: #e2b3b8; }
+  button.danger:hover { background: #fbeaec; }
+
+  #content { flex: 1 1 auto; overflow: auto; padding: 0 16px 16px; }
+
+  table { border-collapse: collapse; width: 100%; background: #fff; }
+  thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: #e3e9f1; color: #34435a; text-align: left;
+    padding: 8px 8px; border-bottom: 2px solid #c3ccd8; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+  }
+  thead th .arrow { color: #7a8794; font-size: 10px; }
+  tbody td { padding: 6px 8px; border-bottom: 1px solid #e6eaf0; vertical-align: top; }
+  tbody tr:hover { background: #f3f7fd; }
+  tbody tr.warn { background: #fff4e5; }
+  tbody tr.warn:hover { background: #ffedd4; }
+  tbody tr.ordered td.status { color: #1f6feb; font-weight: 600; }
+
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge.ok { background: #e3f4e8; color: #1a7f37; }
+  .badge.low { background: #fde4d4; color: #b64a10; }
+  .badge.zero { background: #fbd3d6; color: #a1121f; }
+  .badge.ordered { background: #dce8fd; color: #1f4fb0; }
+
+  .qty { font-weight: 600; font-size: 14px; }
+  .muted { color: #7a8794; }
+  .kw { color: #52606d; font-size: 12px; }
+  a.link { color: #2f6fbf; cursor: pointer; text-decoration: underline; }
+
+  .actions { white-space: nowrap; }
+  .actions button { margin-right: 3px; }
+
+  footer { background: #f7f9fc; border-top: 1px solid #d5dae2; padding: 6px 16px; font-size: 12px; color: #52606d; }
+
+  /* modal */
+  #overlay {
+    display: none; position: fixed; left: 0; top: 0; width: 100%; height: 100%;
+    background: rgba(20,30,45,.45); z-index: 100;
+  }
+  #modal {
+    background: #fff; width: 640px; max-width: 92%; margin: 40px auto; border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.3); overflow: hidden;
+  }
+  #modal .mhead { background: #1f3a5f; color: #fff; padding: 12px 18px; font-size: 16px; font-weight: 600; }
+  #modal .mbody { padding: 18px; max-height: 70vh; overflow: auto; }
+  #modal .mfoot { padding: 12px 18px; border-top: 1px solid #e0e5ec; text-align: right; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: #52606d; margin-bottom: 3px; }
+  .field input, .field select, .field textarea { width: 100%; }
+  .row2 { display: flex; gap: 12px; }
+  .row2 .field { flex: 1; }
+  .hint { font-size: 11px; color: #90a0b0; margin-top: 2px; }
+</style>
+
+<script language="JScript">
+// ===================== Ersatzteildatenbank (HTA) =====================
+var DATA_FILE = "ersatzteile.json";
+var parts = [];          // Array von Teil-Objekten
+var sortKey = "artikelnummer";
+var sortAsc = true;
+var editId = null;       // aktuell bearbeitete ID
+
+// ---- Persistenz via ADODB.Stream (UTF-8) ----
+function scriptDir() {
+  var fso = new ActiveXObject("Scripting.FileSystemObject");
+  var path = unescape(location.pathname);
+  if (path.charAt(0) == "/") path = path.substring(1); // führenden Slash entfernen
+  path = path.replace(/\//g, "\\");
+  return fso.GetParentFolderName(path);
+}
+function dataPath() { return scriptDir() + "\\" + DATA_FILE; }
+
+function readFileUtf8(p) {
+  var fso = new ActiveXObject("Scripting.FileSystemObject");
+  if (!fso.FileExists(p)) return "";
+  var s = new ActiveXObject("ADODB.Stream");
+  s.Type = 2; s.Charset = "utf-8"; s.Open();
+  s.LoadFromFile(p);
+  var txt = s.ReadText(-1);
+  s.Close();
+  // BOM entfernen falls vorhanden
+  if (txt.length && txt.charCodeAt(0) == 0xFEFF) txt = txt.substring(1);
+  return txt;
+}
+function writeFileUtf8(p, txt) {
+  var s = new ActiveXObject("ADODB.Stream");
+  s.Type = 2; s.Charset = "utf-8"; s.Open();
+  s.WriteText(txt);
+  // ohne BOM speichern
+  s.Position = 0; s.Type = 1;
+  s.Position = 3; // 3-Byte UTF-8 BOM überspringen
+  var noBom = new ActiveXObject("ADODB.Stream");
+  noBom.Type = 1; noBom.Open();
+  s.CopyTo(noBom);
+  s.Flush(); s.Close();
+  noBom.SaveToFile(p, 2); // 2 = overwrite
+  noBom.Close();
+}
+
+// ---- JSON (eigener Serializer/Parser für alte IE-Engine) ----
+function jsonParse(str) {
+  if (!str || !trim(str).length) return [];
+  try { return eval("(" + str + ")"); } catch (e) { alert("Datendatei konnte nicht gelesen werden:\n" + e.message); return []; }
+}
+function esc(s) {
+  s = "" + s;
+  s = s.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+  s = s.replace(/\r/g, "\\r").replace(/\n/g, "\\n").replace(/\t/g, "\\t");
+  return s;
+}
+function jsonStringify(arr) {
+  var out = ["["];
+  for (var i = 0; i < arr.length; i++) {
+    var p = arr[i]; var f = [];
+    for (var k in p) {
+      if (!p.hasOwnProperty(k)) continue;
+      var v = p[k];
+      if (typeof v == "number") f.push("\"" + k + "\":" + v);
+      else if (typeof v == "boolean") f.push("\"" + k + "\":" + (v ? "true" : "false"));
+      else f.push("\"" + k + "\":\"" + esc(v) + "\"");
+    }
+    out.push((i ? "," : "") + "\n  {" + f.join(",") + "}");
+  }
+  out.push("\n]");
+  return out.join("");
+}
+
+// ---- Utils ----
+function trim(s) { return ("" + s).replace(/^\s+|\s+$/g, ""); }
+function byId(id) { return document.getElementById(id); }
+function num(v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+function nowStamp() {
+  var d = new Date();
+  function p(n){ return (n<10?"0":"")+n; }
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());
+}
+function newId() { return "T" + (new Date()).getTime() + Math.floor(Math.random()*1000); }
+function htmlEnc(s) {
+  s = "" + (s == null ? "" : s);
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// Normalisiert ein Teil-Objekt (Standardfelder)
+function normalize(p) {
+  return {
+    id:            p.id || newId(),
+    artikelnummer: p.artikelnummer || "",
+    bezeichnung:   p.bezeichnung || "",
+    schlagworte:   p.schlagworte || "",
+    bauteil:       p.bauteil || "",          // Zuordnung Teil -> Bauteil (später)
+    lagerort:      p.lagerort || "",
+    bestand:       num(p.bestand),
+    mindestbestand:num(p.mindestbestand),
+    status:        p.status || "Vorhanden",  // Vorhanden | Bestellt
+    nachfolger:    p.nachfolger || "",       // Artikelnummer des Nachfolgers
+    hersteller:    p.hersteller || "",
+    bemerkung:     p.bemerkung || "",
+    geaendert:     p.geaendert || ""
+  };
+}
+
+// ---- Laden / Speichern ----
+function loadData() {
+  var raw = readFileUtf8(dataPath());
+  var arr = jsonParse(raw);
+  parts = [];
+  for (var i = 0; i < arr.length; i++) parts.push(normalize(arr[i]));
+  if (!parts.length) seedIfEmpty();
+}
+function saveData() {
+  try {
+    writeFileUtf8(dataPath(), jsonStringify(parts));
+  } catch (e) {
+    alert("Speichern fehlgeschlagen:\n" + e.message + "\n\nSpeicherort: " + dataPath());
+  }
+}
+function seedIfEmpty() {
+  // Beispieldatensatz, wird beim ersten Start erzeugt
+  parts = [ normalize({
+    artikelnummer: "BEISPIEL-001",
+    bezeichnung: "Beispiel-Ersatzteil (bitte löschen)",
+    schlagworte: "beispiel, demo",
+    bauteil: "",
+    lagerort: "Regal A1",
+    bestand: 5, mindestbestand: 2,
+    status: "Vorhanden", nachfolger: "",
+    hersteller: "", bemerkung: "Dieser Datensatz wurde automatisch angelegt.",
+    geaendert: nowStamp()
+  }) ];
+  saveData();
+}
+
+// ---- Bestandslogik ----
+function stockClass(p) {
+  if (p.bestand <= 0) return "zero";
+  if (p.bestand <= p.mindestbestand) return "low";
+  return "ok";
+}
+function isWarn(p) { return p.bestand <= p.mindestbestand; }
+
+// ---- Filtern / Sortieren / Rendern ----
+function currentFiltered() {
+  var q = trim(byId("q").value).toLowerCase();
+  var terms = q.length ? q.split(/\s+/) : [];
+  var stat = byId("fStatus").value;
+  var onlyWarn = byId("fWarn").checked;
+
+  var res = [];
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i];
+    if (stat != "" && p.status != stat) continue;
+    if (onlyWarn && !isWarn(p)) continue;
+    if (terms.length) {
+      var hay = (p.artikelnummer + " " + p.bezeichnung + " " + p.schlagworte + " " +
+                 p.bauteil + " " + p.lagerort + " " + p.hersteller + " " + p.nachfolger).toLowerCase();
+      var ok = true;
+      for (var t = 0; t < terms.length; t++) { if (hay.indexOf(terms[t]) < 0) { ok = false; break; } }
+      if (!ok) continue;
+    }
+    res.push(p);
+  }
+  res.sort(function(a, b) {
+    var va = a[sortKey], vb = b[sortKey];
+    if (typeof va == "number" && typeof vb == "number") { return sortAsc ? va - vb : vb - va; }
+    va = ("" + va).toLowerCase(); vb = ("" + vb).toLowerCase();
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    return 0;
+  });
+  return res;
+}
+
+function statusBadge(p) {
+  if (p.status == "Bestellt") return '<span class="badge ordered">Bestellt</span>';
+  var c = stockClass(p);
+  if (c == "zero") return '<span class="badge zero">Leer</span>';
+  if (c == "low")  return '<span class="badge low">Niedrig</span>';
+  return '<span class="badge ok">OK</span>';
+}
+
+function findByArtikelnummer(an) {
+  an = trim(an).toLowerCase();
+  for (var i = 0; i < parts.length; i++) if (parts[i].artikelnummer.toLowerCase() == an) return parts[i];
+  return null;
+}
+
+function render() {
+  var list = currentFiltered();
+  var warnCount = 0;
+  for (var i = 0; i < parts.length; i++) if (isWarn(parts[i])) warnCount++;
+
+  function arrow(k) { return sortKey == k ? '<span class="arrow">' + (sortAsc ? "▲" : "▼") + '</span>' : ''; }
+
+  var h = [];
+  h.push('<table>');
+  h.push('<thead><tr>');
+  h.push('<th onclick="setSort(\'artikelnummer\')">Artikel-Nr. '+arrow('artikelnummer')+'</th>');
+  h.push('<th onclick="setSort(\'bezeichnung\')">Bezeichnung '+arrow('bezeichnung')+'</th>');
+  h.push('<th onclick="setSort(\'bauteil\')">Bauteil '+arrow('bauteil')+'</th>');
+  h.push('<th onclick="setSort(\'lagerort\')">Lagerort '+arrow('lagerort')+'</th>');
+  h.push('<th onclick="setSort(\'bestand\')" style="text-align:right">Bestand '+arrow('bestand')+'</th>');
+  h.push('<th onclick="setSort(\'mindestbestand\')" style="text-align:right">Min '+arrow('mindestbestand')+'</th>');
+  h.push('<th onclick="setSort(\'status\')">Status '+arrow('status')+'</th>');
+  h.push('<th onclick="setSort(\'nachfolger\')">Nachfolger '+arrow('nachfolger')+'</th>');
+  h.push('<th style="width:1%">Aktionen</th>');
+  h.push('</tr></thead><tbody>');
+
+  if (!list.length) {
+    h.push('<tr><td colspan="9" class="muted" style="padding:20px;text-align:center">Keine Treffer.</td></tr>');
+  }
+
+  for (var j = 0; j < list.length; j++) {
+    var p = list[j];
+    var rc = [];
+    if (isWarn(p)) rc.push("warn");
+    if (p.status == "Bestellt") rc.push("ordered");
+    var kw = p.schlagworte ? '<div class="kw">'+htmlEnc(p.schlagworte)+'</div>' : '';
+
+    var nf = "";
+    if (trim(p.nachfolger).length) {
+      var target = findByArtikelnummer(p.nachfolger);
+      if (target) nf = '<a class="link" onclick="jumpTo(\''+target.id+'\')">'+htmlEnc(p.nachfolger)+'</a>';
+      else nf = htmlEnc(p.nachfolger) + ' <span class="muted">(n. angelegt)</span>';
+    }
+
+    h.push('<tr class="'+rc.join(" ")+'" id="row_'+p.id+'">');
+    h.push('<td><strong>'+htmlEnc(p.artikelnummer)+'</strong></td>');
+    h.push('<td>'+htmlEnc(p.bezeichnung)+kw+'</td>');
+    h.push('<td>'+htmlEnc(p.bauteil)+'</td>');
+    h.push('<td>'+htmlEnc(p.lagerort)+'</td>');
+    h.push('<td style="text-align:right"><span class="qty">'+p.bestand+'</span></td>');
+    h.push('<td style="text-align:right">'+p.mindestbestand+'</td>');
+    h.push('<td class="status">'+statusBadge(p)+'</td>');
+    h.push('<td>'+nf+'</td>');
+    h.push('<td class="actions">');
+    h.push('<button class="small" onclick="einbuchen(\''+p.id+'\')" title="Einbuchen">+ Ein</button>');
+    h.push('<button class="small" onclick="ausbuchen(\''+p.id+'\')" title="Ausbuchen">- Aus</button>');
+    h.push('<button class="small" onclick="toggleBestellt(\''+p.id+'\')" title="Status Bestellt umschalten">'+(p.status=="Bestellt"?"✓ Best.":"Best.")+'</button>');
+    h.push('<button class="small" onclick="openEdit(\''+p.id+'\')">Bearb.</button>');
+    h.push('<button class="small danger" onclick="delPart(\''+p.id+'\')">Löschen</button>');
+    h.push('</td></tr>');
+  }
+  h.push('</tbody></table>');
+  byId("content").innerHTML = h.join("");
+
+  byId("stat").innerHTML = list.length + " von " + parts.length + " Teilen angezeigt · " +
+    '<span style="color:#b64a10;font-weight:600">' + warnCount + " unter Grenzwert" + '</span>' +
+    " · Datei: " + htmlEnc(dataPath());
+}
+
+function setSort(k) {
+  if (sortKey == k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = true; }
+  render();
+}
+function jumpTo(id) {
+  byId("q").value = ""; byId("fStatus").value = ""; byId("fWarn").checked = false;
+  render();
+  var row = byId("row_" + id);
+  if (row) { row.scrollIntoView(); row.style.background = "#d7ecff"; }
+}
+
+// ---- Aktionen ----
+function getPart(id) { for (var i=0;i<parts.length;i++) if (parts[i].id==id) return parts[i]; return null; }
+
+function einbuchen(id) {
+  var p = getPart(id); if (!p) return;
+  var v = prompt("Einbuchen – Menge für:\n" + p.artikelnummer + " (" + p.bezeichnung + ")\nAktueller Bestand: " + p.bestand, "1");
+  if (v == null) return;
+  var n = num(v); if (n <= 0) { alert("Bitte positive Menge eingeben."); return; }
+  p.bestand += n;
+  if (p.status == "Bestellt" && p.bestand > p.mindestbestand) p.status = "Vorhanden"; // Ware da -> nicht mehr "bestellt"
+  p.geaendert = nowStamp();
+  saveData(); render();
+}
+function ausbuchen(id) {
+  var p = getPart(id); if (!p) return;
+  var v = prompt("Ausbuchen – Menge für:\n" + p.artikelnummer + " (" + p.bezeichnung + ")\nAktueller Bestand: " + p.bestand, "1");
+  if (v == null) return;
+  var n = num(v); if (n <= 0) { alert("Bitte positive Menge eingeben."); return; }
+  if (n > p.bestand) { if (!confirm("Menge größer als Bestand. Bestand auf 0 setzen?")) return; n = p.bestand; }
+  p.bestand -= n;
+  p.geaendert = nowStamp();
+  saveData(); render();
+  if (isWarn(p)) {
+    var msg = "⚠ Warnung: Bestand für " + p.artikelnummer + " (" + p.bestand + ") ist unter dem Grenzwert (" + p.mindestbestand + ").";
+    if (trim(p.nachfolger).length) msg += "\nNachfolger: " + p.nachfolger;
+    alert(msg);
+  }
+}
+function toggleBestellt(id) {
+  var p = getPart(id); if (!p) return;
+  p.status = (p.status == "Bestellt") ? "Vorhanden" : "Bestellt";
+  p.geaendert = nowStamp();
+  saveData(); render();
+}
+function delPart(id) {
+  var p = getPart(id); if (!p) return;
+  if (!confirm("Teil wirklich löschen?\n" + p.artikelnummer + " – " + p.bezeichnung)) return;
+  for (var i=0;i<parts.length;i++) if (parts[i].id==id) { parts.splice(i,1); break; }
+  saveData(); render();
+}
+
+// ---- Formular (Modal) ----
+function openNew() {
+  editId = null;
+  byId("mtitle").innerHTML = "Neues Teil anlegen";
+  setField("f_artikelnummer",""); setField("f_bezeichnung",""); setField("f_schlagworte","");
+  setField("f_bauteil",""); setField("f_lagerort",""); setField("f_bestand","0");
+  setField("f_mindestbestand","0"); setField("f_status","Vorhanden"); setField("f_nachfolger","");
+  setField("f_hersteller",""); setField("f_bemerkung","");
+  showModal(true);
+}
+function openEdit(id) {
+  var p = getPart(id); if (!p) return;
+  editId = id;
+  byId("mtitle").innerHTML = "Teil bearbeiten";
+  setField("f_artikelnummer",p.artikelnummer); setField("f_bezeichnung",p.bezeichnung);
+  setField("f_schlagworte",p.schlagworte); setField("f_bauteil",p.bauteil);
+  setField("f_lagerort",p.lagerort); setField("f_bestand",p.bestand);
+  setField("f_mindestbestand",p.mindestbestand); setField("f_status",p.status);
+  setField("f_nachfolger",p.nachfolger); setField("f_hersteller",p.hersteller);
+  setField("f_bemerkung",p.bemerkung);
+  showModal(true);
+}
+function setField(id,v){ byId(id).value = (v==null?"":v); }
+function showModal(on){ byId("overlay").style.display = on ? "block" : "none"; if(on) byId("f_artikelnummer").focus(); }
+function closeModal(){ showModal(false); }
+
+function saveForm() {
+  var an = trim(byId("f_artikelnummer").value);
+  if (!an.length) { alert("Bitte Artikelnummer eingeben."); byId("f_artikelnummer").focus(); return; }
+  // Duplikatprüfung
+  var dup = findByArtikelnummer(an);
+  if (dup && dup.id != editId) { if (!confirm("Artikelnummer existiert bereits. Trotzdem speichern?")) return; }
+
+  var p = editId ? getPart(editId) : normalize({});
+  p.artikelnummer = an;
+  p.bezeichnung   = trim(byId("f_bezeichnung").value);
+  p.schlagworte   = trim(byId("f_schlagworte").value);
+  p.bauteil       = trim(byId("f_bauteil").value);
+  p.lagerort      = trim(byId("f_lagerort").value);
+  p.bestand       = num(byId("f_bestand").value);
+  p.mindestbestand= num(byId("f_mindestbestand").value);
+  p.status        = byId("f_status").value;
+  p.nachfolger    = trim(byId("f_nachfolger").value);
+  p.hersteller    = trim(byId("f_hersteller").value);
+  p.bemerkung     = trim(byId("f_bemerkung").value);
+  p.geaendert     = nowStamp();
+
+  if (!editId) parts.push(p);
+  saveData(); closeModal(); render();
+}
+
+// ---- CSV Export / Import ----
+function exportCsv() {
+  var sep = ";";
+  var cols = ["artikelnummer","bezeichnung","schlagworte","bauteil","lagerort","bestand","mindestbestand","status","nachfolger","hersteller","bemerkung","geaendert"];
+  var lines = [cols.join(sep)];
+  function q(v){ v="" + (v==null?"":v); if (v.indexOf(sep)>=0 || v.indexOf('"')>=0 || v.indexOf("\n")>=0) v='"'+v.replace(/"/g,'""')+'"'; return v; }
+  for (var i=0;i<parts.length;i++){ var p=parts[i]; var r=[]; for (var c=0;c<cols.length;c++) r.push(q(p[cols[c]])); lines.push(r.join(sep)); }
+  var path = scriptDir() + "\\ersatzteile_export.csv";
+  try { writeFileUtf8(path, lines.join("\r\n")); alert("Export gespeichert:\n" + path); }
+  catch(e){ alert("Export fehlgeschlagen:\n" + e.message); }
+}
+function importCsv() {
+  var path = prompt("Pfad zur CSV-Datei (Spalten mit ; getrennt, Kopfzeile mit Feldnamen):", scriptDir()+"\\import.csv");
+  if (path == null) return;
+  var fso = new ActiveXObject("Scripting.FileSystemObject");
+  if (!fso.FileExists(path)) { alert("Datei nicht gefunden:\n"+path); return; }
+  var raw = readFileUtf8(path);
+  var rows = raw.split(/\r\n|\n|\r/);
+  if (rows.length < 2) { alert("Keine Daten gefunden."); return; }
+  var header = splitCsv(rows[0], ";");
+  var added=0, updated=0;
+  for (var i=1;i<rows.length;i++){
+    if (!trim(rows[i]).length) continue;
+    var cells = splitCsv(rows[i], ";");
+    var obj = {};
+    for (var c=0;c<header.length;c++) obj[trim(header[c])] = cells[c]!=null?cells[c]:"";
+    var np = normalize(obj);
+    var ex = findByArtikelnummer(np.artikelnummer);
+    if (ex) { np.id = ex.id; for (var k in np) if (np.hasOwnProperty(k)) ex[k]=np[k]; updated++; }
+    else { parts.push(np); added++; }
+  }
+  saveData(); render();
+  alert("Import fertig.\nNeu: "+added+"\nAktualisiert: "+updated);
+}
+function splitCsv(line, sep) {
+  var out=[], cur="", inQ=false;
+  for (var i=0;i<line.length;i++){
+    var ch=line.charAt(i);
+    if (inQ){ if (ch=='"'){ if (line.charAt(i+1)=='"'){cur+='"';i++;} else inQ=false; } else cur+=ch; }
+    else { if (ch=='"') inQ=true; else if (ch==sep){ out.push(cur); cur=""; } else cur+=ch; }
+  }
+  out.push(cur); return out;
+}
+
+// ---- Tastatur ----
+function onSearchKey() { render(); }
+function init() {
+  loadData();
+  render();
+  byId("q").focus();
+}
+</script>
+</head>
+
+<body onload="init()">
+<div id="app">
+  <header>
+    <h1>&#128295; Ersatzteildatenbank</h1>
+    <button class="primary" onclick="openNew()">+ Neues Teil</button>
+    <button onclick="exportCsv()">CSV Export</button>
+    <button onclick="importCsv()">CSV Import</button>
+    <span class="grow"></span>
+  </header>
+
+  <div class="toolbar">
+    <label>Suche:</label>
+    <input type="text" id="q" placeholder="Artikelnummer, Schlagwort, Bezeichnung, Bauteil, Lagerort ..." onkeyup="onSearchKey()" />
+    <label>Status:</label>
+    <select id="fStatus" onchange="render()">
+      <option value="">Alle</option>
+      <option value="Vorhanden">Vorhanden</option>
+      <option value="Bestellt">Bestellt</option>
+    </select>
+    <label><input type="checkbox" id="fWarn" onclick="render()" /> nur Warnungen (unter Grenzwert)</label>
+    <button onclick="byId('q').value='';byId('fStatus').value='';byId('fWarn').checked=false;render();byId('q').focus();">Zur&uuml;cksetzen</button>
+  </div>
+
+  <div id="content"></div>
+
+  <footer><span id="stat"></span></footer>
+</div>
+
+<!-- Modal -->
+<div id="overlay">
+  <div id="modal">
+    <div class="mhead" id="mtitle">Teil</div>
+    <div class="mbody">
+      <div class="row2">
+        <div class="field">
+          <label>Artikelnummer *</label>
+          <input type="text" id="f_artikelnummer" />
+        </div>
+        <div class="field">
+          <label>Hersteller</label>
+          <input type="text" id="f_hersteller" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Bezeichnung</label>
+        <input type="text" id="f_bezeichnung" />
+      </div>
+      <div class="field">
+        <label>Schlagworte (Komma-getrennt, f&uuml;r die Suche)</label>
+        <input type="text" id="f_schlagworte" />
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Bauteil / Zuordnung</label>
+          <input type="text" id="f_bauteil" />
+          <div class="hint">Zuordnung Teil &rarr; Bauteil (kann sp&auml;ter erg&auml;nzt werden)</div>
+        </div>
+        <div class="field">
+          <label>Lagerort</label>
+          <input type="text" id="f_lagerort" />
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Bestand (St&uuml;ckzahl)</label>
+          <input type="number" id="f_bestand" />
+        </div>
+        <div class="field">
+          <label>Mindestbestand (Grenzwert)</label>
+          <input type="number" id="f_mindestbestand" />
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="f_status">
+            <option value="Vorhanden">Vorhanden</option>
+            <option value="Bestellt">Bestellt</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Nachfolger (Artikelnummer)</label>
+        <input type="text" id="f_nachfolger" />
+        <div class="hint">Artikelnummer des Nachfolge-Teils (wie in der Excel)</div>
+      </div>
+      <div class="field">
+        <label>Bemerkung</label>
+        <textarea id="f_bemerkung" rows="3"></textarea>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button onclick="closeModal()">Abbrechen</button>
+      <button class="primary" onclick="saveForm()">Speichern</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
