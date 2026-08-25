@@ -398,7 +398,7 @@ function getPart(id) { for (var i=0;i<parts.length;i++) if (parts[i].id==id) ret
 
 function einbuchen(id) {
   var p = getPart(id); if (!p) return;
-  var v = prompt("Einbuchen &ndash; Menge für:\n" + p.artikelnummer + " (" + p.bezeichnung + ")\nAktuelle IstMenge: " + p.istMenge, "1");
+  var v = prompt("Einbuchen – Menge für:\n" + p.artikelnummer + " (" + p.bezeichnung + ")\nAktuelle IstMenge: " + p.istMenge, "1");
   if (v == null) return;
   var n = num(v); if (n <= 0) { alert("Bitte positive Menge eingeben."); return; }
   p.istMenge += n;
@@ -408,7 +408,7 @@ function einbuchen(id) {
 }
 function ausbuchen(id) {
   var p = getPart(id); if (!p) return;
-  var v = prompt("Ausbuchen &ndash; Menge für:\n" + p.artikelnummer + " (" + p.bezeichnung + ")\nAktuelle IstMenge: " + p.istMenge, "1");
+  var v = prompt("Ausbuchen – Menge für:\n" + p.artikelnummer + " (" + p.bezeichnung + ")\nAktuelle IstMenge: " + p.istMenge, "1");
   if (v == null) return;
   var n = num(v); if (n <= 0) { alert("Bitte positive Menge eingeben."); return; }
   if (n > p.istMenge) { if (!confirm("Menge größer als Bestand. IstMenge auf 0 setzen?")) return; n = p.istMenge; }
