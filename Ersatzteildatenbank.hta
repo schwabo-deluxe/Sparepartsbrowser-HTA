@@ -681,12 +681,26 @@ function importCsv() {
     for (var c2=0;c2<keys.length;c2++){ if (keys[c2]) obj[keys[c2]] = (cells[c2]!=null?cells[c2]:""); }
     if (!trim(obj.artikelnummer||"").length && !trim(obj.bezeichnung||"").length) continue;
     var np = normalize(obj);
-    var ex = findByArtikelnummer(np.artikelnummer);
-    if (ex && trim(np.artikelnummer).length) { np.id = ex.id; for (var k2 in np) if (np.hasOwnProperty(k2)) ex[k2]=np[k2]; updated++; }
+    var ex = findDuplicate(np);
+    if (ex) { np.id = ex.id; for (var k2 in np) if (np.hasOwnProperty(k2)) ex[k2]=np[k2]; updated++; }
     else { parts.push(np); added++; }
   }
   saveData(); render();
   alert("Import fertig.\nNeu: "+added+"\nAktualisiert: "+updated);
+}
+// Duplikat finden: mit Artikelnummer -> danach; ohne -> Bezeichnung+Bin+Position
+function dupKey(p) {
+  return (trim(p.bezeichnung)+"|"+trim(p.bin)+"|"+trim(p.position)).toLowerCase();
+}
+function findDuplicate(np) {
+  if (trim(np.artikelnummer).length) return findByArtikelnummer(np.artikelnummer);
+  if (!trim(np.bezeichnung).length) return null;
+  var key = dupKey(np);
+  for (var i=0;i<parts.length;i++) {
+    if (trim(parts[i].artikelnummer).length) continue; // nur Teile ohne Artikelnr. vergleichen
+    if (dupKey(parts[i]) == key) return parts[i];
+  }
+  return null;
 }
 function splitCsv(line, sep) {
   var out=[], cur="", inQ=false;
