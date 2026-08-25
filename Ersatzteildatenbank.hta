@@ -356,6 +356,10 @@ function appendLog(aktion, p, menge, vorher, nachher) {
 
 // ---- Bestandslogik ----
 function isWarn(p) { return p.istMenge < p.minMenge; }
+function isIncomplete(p) {
+  return !trim(p.artikelnummer).length || !trim(p.bin).length ||
+         !trim(p.position).length || (p.istMenge == 0 && p.minMenge == 0);
+}
 function stockClass(p) {
   if (p.istMenge <= 0 && p.minMenge > 0) return "zero";
   if (p.istMenge < p.minMenge) return "low";
@@ -369,6 +373,7 @@ function currentFiltered() {
   var stat = byId("fStatus").value;
   var onlyWarn = byId("fWarn").checked;
   var showHidden = byId("fHidden").checked;
+  var onlyIncomplete = byId("fIncomplete").checked;
 
   var res = [];
   for (var i = 0; i < parts.length; i++) {
@@ -377,6 +382,7 @@ function currentFiltered() {
     if (stat == "Bestellt" && !p.bestellt) continue;
     if (stat == "Vorhanden" && p.bestellt) continue;
     if (onlyWarn && !isWarn(p)) continue;
+    if (onlyIncomplete && !isIncomplete(p)) continue;
     if (terms.length) {
       var hay = (p.artikelnummer+" "+p.erwArtNr+" "+p.bezeichnung+" "+p.schlagworte+" "+
                  p.bauteilgruppe+" "+p.bin+" "+p.hersteller+" "+p.zuordnung+" "+p.platz+" "+p.nachfolger+" "+p.posTyp).toLowerCase();
@@ -825,7 +831,8 @@ function init() { loadWidths(); loadData(); render(); byId("q").focus(); }
     </select>
     <label><input type="checkbox" id="fWarn" onclick="render()" /> nur Warnungen (unter MinMenge)</label>
     <label><input type="checkbox" id="fHidden" onclick="render()" /> ausgeblendete anzeigen</label>
-    <button onclick="byId('q').value='';byId('fStatus').value='';byId('fWarn').checked=false;byId('fHidden').checked=false;render();byId('q').focus();">Zur&uuml;cksetzen</button>
+    <label><input type="checkbox" id="fIncomplete" onclick="render()" /> unvollst&auml;ndig (Daten fehlen)</label>
+    <button onclick="byId('q').value='';byId('fStatus').value='';byId('fWarn').checked=false;byId('fHidden').checked=false;byId('fIncomplete').checked=false;render();byId('q').focus();">Zur&uuml;cksetzen</button>
   </div>
 
   <div id="content" onscroll="stickHeader()"></div>
