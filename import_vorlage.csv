@@ -1,3 +1,3 @@
-Position;Menge;Artikelnummer;Erweiterte Art.Nr;Nachfolger;Artikelbezeichnung;Bin;Position/Typ;IstMenge;MinMenge;UnterMinMeng;Bestellt;Bauteilgruppe;Hersteller;Schlagworte;Bemerkung
+Position;Menge;Artikelnummer;Erweiterte Art.Nr;Nachfolger;Artikelbezeichnung;Bin;Position/Typ;IstMenge;MinMenge;UnterMinMeng;Bestellt;Bauteilgruppe;Hersteller;Schlagworte;Bemerkung;Ausgeblendet
 10;2;ABC-123;ABC-123-EXT;ABC-124;Kugellager 6204;A1-03;Lager;5;2;;;Antrieb Foerderband 1;SKF;lager,kugellager;Beispielzeile - bitte ersetzen
 20;1;XYZ-900;;;Keilriemen SPA 1250;B2-11;Riemen;1;3;;ja;Antrieb Foerderband 1;Optibelt;riemen,keilriemen;

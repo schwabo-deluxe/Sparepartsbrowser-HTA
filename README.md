@@ -11,7 +11,11 @@ Ersatzteilen. Keine Installation nötig – `Ersatzteildatenbank.hta` per Doppel
   erscheint sofort eine **Warnung** und es kann direkt auf „Bestellt" gesetzt
   werden (inkl. Hinweis auf den Nachfolger).
 - **Warnung unter Grenzwert**: betroffene Zeilen orange, Zähler in der Fußzeile,
-  Filter „nur Warnungen".
+  Filter „nur Warnungen". Warnung greift, wenn **IstMenge < MinMenge**
+  (IstMenge = MinMenge gilt noch als OK, z. B. 1 / 1).
+- **Ausblenden**: Artikel können ausgeblendet werden (z. B. wenn ein Nachfolger
+  existiert). Ausgeblendete sind standardmäßig nicht sichtbar; mit dem Toolbar-
+  Häkchen „ausgeblendete anzeigen" einblendbar. Spalte `Ausgeblendet` (1/ja/x).
 - **Status „Bestellt"**: Button `Best.` schaltet um. Beim Einbuchen über die
   MinMenge wird „Bestellt" automatisch zurückgesetzt.
 - **Nachfolger** (wie in der Excel): Artikel-Nr. des Nachfolge-Teils; ist es
