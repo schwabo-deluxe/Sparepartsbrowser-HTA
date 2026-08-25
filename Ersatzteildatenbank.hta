@@ -176,6 +176,7 @@ function scriptDir() {
   return fso.GetParentFolderName(path);
 }
 function dataPath() { return scriptDir() + "\\" + DATA_FILE; }
+function logPath() { return scriptDir() + "\\buchungen_log.csv"; }
 
 function readFileUtf8(p) {
   var fso = new ActiveXObject("Scripting.FileSystemObject");
@@ -238,6 +239,12 @@ function nowStamp() {
   function p(n){ return (n<10?"0":"")+n; }
   return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());
 }
+function nowStampFull() {
+  var d = new Date();
+  function p(n){ return (n<10?"0":"")+n; }
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds());
+}
+function winUser() { try { return new ActiveXObject("WScript.Network").UserName; } catch (e) { return ""; } }
 function newId() { return "T" + (new Date()).getTime() + Math.floor(Math.random()*1000); }
 function htmlEnc(s) {
   s = "" + (s == null ? "" : s);
@@ -283,6 +290,22 @@ function loadData() {
 function saveData() {
   try { writeFileUtf8(dataPath(), jsonStringify(parts)); }
   catch (e) { alert("Speichern fehlgeschlagen:\n" + e.message + "\n\nSpeicherort: " + dataPath()); }
+}
+
+// ---- Audit-Trail / Buchungsprotokoll ----
+var LOG_COLS = ["Zeitpunkt","Aktion","Artikelnummer","Bezeichnung","Menge","Bestand_vorher","Bestand_nachher","Benutzer"];
+function appendLog(aktion, p, menge, vorher, nachher) {
+  var sep = ";";
+  try {
+    var existing = readFileUtf8(logPath());
+    if (!trim(existing).length) existing = "﻿" + LOG_COLS.join(sep) + "\r\n";
+    else if (existing.charAt(existing.length-1) != "\n") existing += "\r\n";
+    var line = [ nowStampFull(), aktion, csvQ(p.artikelnummer, sep), csvQ(p.bezeichnung, sep),
+                 menge, vorher, nachher, csvQ(winUser(), sep) ].join(sep);
+    writeFileUtf8(logPath(), existing + line + "\r\n");
+  } catch (e) {
+    alert("Protokoll konnte nicht geschrieben werden:\n" + e.message);
+  }
 }
 
 // ---- Bestandslogik ----
@@ -435,9 +458,11 @@ function einbuchen(id) {
   var v = prompt("Einbuchen – Menge für:\n" + p.artikelnummer + " (" + p.bezeichnung + ")\nAktuelle IstMenge: " + p.istMenge, "1");
   if (v == null) return;
   var n = num(v); if (n <= 0) { alert("Bitte positive Menge eingeben."); return; }
+  var vorher = p.istMenge;
   p.istMenge += n;
   if (p.bestellt && p.istMenge >= p.minMenge) p.bestellt = false; // Ware da -> nicht mehr bestellt
   p.geaendert = nowStamp();
+  appendLog("Einbuchen", p, n, vorher, p.istMenge);
   saveData(); render();
 }
 function ausbuchen(id) {
@@ -446,8 +471,10 @@ function ausbuchen(id) {
   if (v == null) return;
   var n = num(v); if (n <= 0) { alert("Bitte positive Menge eingeben."); return; }
   if (n > p.istMenge) { if (!confirm("Menge größer als Bestand. IstMenge auf 0 setzen?")) return; n = p.istMenge; }
+  var vorher = p.istMenge;
   p.istMenge -= n;
   p.geaendert = nowStamp();
+  appendLog("Ausbuchen", p, n, vorher, p.istMenge);
   saveData(); render();
   if (isWarn(p)) {
     var msg = "⚠ Warnung: IstMenge für " + p.artikelnummer + " (" + p.istMenge + ") ist unter dem Grenzwert (MinMenge " + p.minMenge + ").";
@@ -612,6 +639,42 @@ function splitCsv(line, sep) {
 
 function onSearchKey() { render(); }
 
+// ---- Protokoll-Ansicht ----
+function showLog() {
+  var raw = readFileUtf8(logPath());
+  var body = byId("logBody");
+  var rows = trim(raw).length ? raw.split(/\r\n|\n|\r/) : [];
+  // Kopfzeile entfernen
+  if (rows.length && rows[0].indexOf("Zeitpunkt") == 0) rows.shift();
+  var filt = trim(byId("logFilter").value).toLowerCase();
+
+  var h = ['<table><thead><tr>'];
+  for (var c=0;c<LOG_COLS.length;c++) h.push('<th>'+LOG_COLS[c].replace(/_/g," ")+'</th>');
+  h.push('</tr></thead><tbody>');
+  var shown = 0;
+  for (var i = rows.length-1; i >= 0; i--) { // neueste zuerst
+    if (!trim(rows[i]).length) continue;
+    if (filt.length && rows[i].toLowerCase().indexOf(filt) < 0) continue;
+    var cells = splitCsv(rows[i], ";");
+    h.push('<tr>');
+    for (var c2=0;c2<LOG_COLS.length;c2++) {
+      var v = cells[c2]!=null?cells[c2]:"";
+      var cls = (LOG_COLS[c2]=="Aktion" && v=="Ausbuchen") ? ' style="color:#b64a10;font-weight:600"' :
+                (LOG_COLS[c2]=="Aktion" && v=="Einbuchen") ? ' style="color:#1a7f37;font-weight:600"' : '';
+      h.push('<td'+cls+'>'+htmlEnc(v)+'</td>');
+    }
+    h.push('</tr>');
+    shown++;
+  }
+  if (!shown) h.push('<tr><td colspan="'+LOG_COLS.length+'" class="muted" style="padding:20px;text-align:center">Keine Buchungen protokolliert.</td></tr>');
+  h.push('</tbody></table>');
+  body.innerHTML = h.join("");
+  byId("logCount").innerHTML = shown + " Buchung(en) &middot; Datei: " + htmlEnc(logPath());
+  byId("logOverlay").style.display = "block";
+}
+function closeLog() { byId("logOverlay").style.display = "none"; }
+function refreshLog() { showLog(); }
+
 // Kopfzeile anheften (IE-Engine kennt kein position:sticky -> per Scroll nachführen)
 function stickHeader() {
   var c = byId("content");
@@ -631,6 +694,7 @@ function init() { loadData(); render(); byId("q").focus(); }
     <button class="primary" onclick="openNew()">+ Neues Teil</button>
     <button onclick="exportCsv()">CSV Export</button>
     <button onclick="importCsv()">CSV Import</button>
+    <button onclick="showLog()">Protokoll</button>
     <span class="grow"></span>
     <button id="authBtn" onclick="toggleLock()">&#128274; Gesperrt</button>
   </header>
@@ -700,6 +764,23 @@ function init() { loadData(); render(); byId("q").focus(); }
       <button onclick="closeModal()">Abbrechen</button>
       <button class="primary" onclick="saveForm()">Speichern</button>
     </div>
+  </div>
+</div>
+
+<!-- Protokoll -->
+<div id="logOverlay" style="display:none;position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(20,30,45,.45);z-index:100;">
+  <div style="background:#fff;width:1000px;max-width:96%;margin:24px auto;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.3);overflow:hidden;">
+    <div class="mhead">Buchungsprotokoll (Audit-Trail)</div>
+    <div style="padding:10px 18px;border-bottom:1px solid #e0e5ec;">
+      <label>Filter:</label>
+      <input type="text" id="logFilter" placeholder="Artikel, Benutzer, Aktion, Datum ..." onkeyup="refreshLog()" style="min-width:280px" />
+      <button onclick="refreshLog()">Aktualisieren</button>
+      <span id="logCount" class="muted" style="margin-left:10px"></span>
+    </div>
+    <div style="padding:0 18px 8px;max-height:70vh;overflow:auto;">
+      <div id="logBody"></div>
+    </div>
+    <div class="mfoot"><button class="primary" onclick="closeLog()">Schlie&szlig;en</button></div>
   </div>
 </div>
 </body>

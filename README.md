@@ -31,6 +31,11 @@ Ersatzteilen. Keine Installation nötig – `Ersatzteildatenbank.hta` per Doppel
   Bestellt-Umschalten bleiben ohne Passwort möglich. Button oben rechts
   entsperrt/sperrt die Sitzung.
 - **Angeheftete Kopfzeile**: die Spaltenüberschriften bleiben beim Scrollen oben.
+- **Buchungsprotokoll (Audit-Trail)**: jede Ein-/Ausbuchung wird in
+  `buchungen_log.csv` (neben der HTA) protokolliert – mit Zeitpunkt, Aktion,
+  Artikelnummer, Bezeichnung, Menge, Bestand vorher/nachher und Windows-Benutzer.
+  Über den Button „Protokoll" einsehbar und filterbar. Die Datei kann direkt in
+  Excel geöffnet werden.
 - Sortierung per Spaltenklick, CSV-Export/-Import.
 
 ## Datenmodell (an die Excel „Ersatzteilmatrix" angelehnt)
