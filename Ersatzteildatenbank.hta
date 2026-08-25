@@ -61,7 +61,7 @@
 
   table { border-collapse: collapse; width: 100%; background: #fff; }
   thead th {
-    position: sticky; top: 0; z-index: 2;
+    position: relative; top: 0; z-index: 5;
     background: #e3e9f1; color: #34435a; text-align: left;
     padding: 8px 8px; border-bottom: 2px solid #c3ccd8; font-weight: 600;
     cursor: pointer; white-space: nowrap;
@@ -121,6 +121,28 @@ var sortKey = "position";
 var sortAsc = true;
 var editId = null;
 
+// ---- Zugriffsschutz -------------------------------------------------
+// Passwort für Bearbeiten / Löschen / Neu anlegen / Import.
+// >>> HIER DAS PASSWORT ANPASSEN <<<
+var ADMIN_PW = "1234";
+var authed = false;
+function requireAuth() {
+  if (authed) return true;
+  var pw = prompt("Passwort für Bearbeiten / Löschen / Anlegen:", "");
+  if (pw == null) return false;
+  if (pw == ADMIN_PW) { authed = true; updateAuthUi(); return true; }
+  alert("Falsches Passwort.");
+  return false;
+}
+function toggleLock() {
+  if (authed) { authed = false; updateAuthUi(); }
+  else { requireAuth(); }
+}
+function updateAuthUi() {
+  var b = byId("authBtn");
+  if (b) b.innerHTML = authed ? "&#128275; Entsperrt" : "&#128274; Gesperrt";
+}
+
 // Interne Felder <-> Excel-Spaltenüberschriften (für CSV-Import/-Export)
 // Reihenfolge = Reihenfolge in der Excel
 var COLMAP = [
@@ -138,6 +160,7 @@ var COLMAP = [
   { key:"bestellt",      xls:"Bestellt" },
   { key:"bauteilgruppe", xls:"Bauteilgruppe" },
   { key:"hersteller",    xls:"Hersteller" },
+  { key:"zuordnung",     xls:"Zuordnung" },
   { key:"schlagworte",   xls:"Schlagworte" },
   { key:"bemerkung",     xls:"Bemerkung" },
   { key:"ausgeblendet",  xls:"Ausgeblendet" },
@@ -242,6 +265,7 @@ function normalize(p) {
     bestellt:      (typeof p.bestellt == "boolean") ? p.bestellt : truthy(p.bestellt),
     bauteilgruppe: trim(p.bauteilgruppe),
     hersteller:    trim(p.hersteller),
+    zuordnung:     trim(p.zuordnung),
     schlagworte:   trim(p.schlagworte),
     bemerkung:     trim(p.bemerkung),
     ausgeblendet:  (typeof p.ausgeblendet == "boolean") ? p.ausgeblendet : truthy(p.ausgeblendet),
@@ -286,7 +310,7 @@ function currentFiltered() {
     if (onlyWarn && !isWarn(p)) continue;
     if (terms.length) {
       var hay = (p.artikelnummer+" "+p.erwArtNr+" "+p.bezeichnung+" "+p.schlagworte+" "+
-                 p.bauteilgruppe+" "+p.bin+" "+p.hersteller+" "+p.nachfolger+" "+p.posTyp).toLowerCase();
+                 p.bauteilgruppe+" "+p.bin+" "+p.hersteller+" "+p.zuordnung+" "+p.nachfolger+" "+p.posTyp).toLowerCase();
       var ok = true;
       for (var t = 0; t < terms.length; t++) { if (hay.indexOf(terms[t]) < 0) { ok = false; break; } }
       if (!ok) continue;
@@ -357,6 +381,7 @@ function render() {
     var sub = [];
     if (trim(p.erwArtNr).length) sub.push("erw.: "+htmlEnc(p.erwArtNr));
     if (trim(p.hersteller).length) sub.push(htmlEnc(p.hersteller));
+    if (trim(p.zuordnung).length) sub.push(htmlEnc(p.zuordnung));
     var subHtml = sub.length ? '<div class="sub">'+sub.join(" &middot; ")+'</div>' : '';
     var kw = p.schlagworte ? '<div class="kw">'+htmlEnc(p.schlagworte)+'</div>' : '';
 
@@ -391,6 +416,7 @@ function render() {
 
   byId("stat").innerHTML = list.length + " von " + parts.length + " Teilen angezeigt &middot; " +
     '<span style="color:#b64a10;font-weight:600">' + warnCount + " unter Grenzwert</span> &middot; Datei: " + htmlEnc(dataPath());
+  stickHeader();
 }
 
 function setSort(k) { if (sortKey == k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = true; } render(); }
@@ -442,6 +468,7 @@ function toggleHidden(id) {
   saveData(); render();
 }
 function delPart(id) {
+  if (!requireAuth()) return;
   var p = getPart(id); if (!p) return;
   if (!confirm("Teil wirklich löschen?\n" + p.artikelnummer + " – " + p.bezeichnung)) return;
   for (var i=0;i<parts.length;i++) if (parts[i].id==id) { parts.splice(i,1); break; }
@@ -450,15 +477,17 @@ function delPart(id) {
 
 // ---- Formular ----
 function openNew() {
+  if (!requireAuth()) return;
   editId = null;
   byId("mtitle").innerHTML = "Neues Teil anlegen";
-  var f = ["position","menge","artikelnummer","erwArtNr","nachfolger","bezeichnung","bin","posTyp","istMenge","minMenge","bauteilgruppe","hersteller","schlagworte","bemerkung"];
+  var f = ["position","menge","artikelnummer","erwArtNr","nachfolger","bezeichnung","bin","posTyp","istMenge","minMenge","bauteilgruppe","hersteller","zuordnung","schlagworte","bemerkung"];
   for (var i=0;i<f.length;i++) setField("f_"+f[i], (f[i]=="menge"||f[i]=="istMenge"||f[i]=="minMenge")?"0":"");
   byId("f_bestellt").checked = false;
   byId("f_ausgeblendet").checked = false;
   showModal(true);
 }
 function openEdit(id) {
+  if (!requireAuth()) return;
   var p = getPart(id); if (!p) return;
   editId = id;
   byId("mtitle").innerHTML = "Teil bearbeiten";
@@ -468,6 +497,7 @@ function openEdit(id) {
   setField("f_bin",p.bin); setField("f_posTyp",p.posTyp);
   setField("f_istMenge",p.istMenge); setField("f_minMenge",p.minMenge);
   setField("f_bauteilgruppe",p.bauteilgruppe); setField("f_hersteller",p.hersteller);
+  setField("f_zuordnung",p.zuordnung);
   setField("f_schlagworte",p.schlagworte); setField("f_bemerkung",p.bemerkung);
   byId("f_bestellt").checked = p.bestellt;
   byId("f_ausgeblendet").checked = p.ausgeblendet;
@@ -498,6 +528,7 @@ function saveForm() {
   p.ausgeblendet = byId("f_ausgeblendet").checked;
   p.bauteilgruppe= trim(byId("f_bauteilgruppe").value);
   p.hersteller   = trim(byId("f_hersteller").value);
+  p.zuordnung    = trim(byId("f_zuordnung").value);
   p.schlagworte  = trim(byId("f_schlagworte").value);
   p.bemerkung    = trim(byId("f_bemerkung").value);
   p.geaendert    = nowStamp();
@@ -541,6 +572,7 @@ function exportCsv() {
 }
 
 function importCsv() {
+  if (!requireAuth()) return;
   var path = prompt("Pfad zur CSV-Datei (Semikolon-getrennt, Kopfzeile mit den Excel-Spaltennamen):", scriptDir()+"\\import.csv");
   if (path == null) return;
   var fso = new ActiveXObject("Scripting.FileSystemObject");
@@ -579,6 +611,15 @@ function splitCsv(line, sep) {
 }
 
 function onSearchKey() { render(); }
+
+// Kopfzeile anheften (IE-Engine kennt kein position:sticky -> per Scroll nachführen)
+function stickHeader() {
+  var c = byId("content");
+  var ths = c.getElementsByTagName("th");
+  var t = c.scrollTop;
+  for (var i = 0; i < ths.length; i++) ths[i].style.top = t + "px";
+}
+
 function init() { loadData(); render(); byId("q").focus(); }
 </script>
 </head>
@@ -591,6 +632,7 @@ function init() { loadData(); render(); byId("q").focus(); }
     <button onclick="exportCsv()">CSV Export</button>
     <button onclick="importCsv()">CSV Import</button>
     <span class="grow"></span>
+    <button id="authBtn" onclick="toggleLock()">&#128274; Gesperrt</button>
   </header>
 
   <div class="toolbar">
@@ -607,7 +649,7 @@ function init() { loadData(); render(); byId("q").focus(); }
     <button onclick="byId('q').value='';byId('fStatus').value='';byId('fWarn').checked=false;byId('fHidden').checked=false;render();byId('q').focus();">Zur&uuml;cksetzen</button>
   </div>
 
-  <div id="content"></div>
+  <div id="content" onscroll="stickHeader()"></div>
   <footer><span id="stat"></span></footer>
 </div>
 
@@ -629,9 +671,10 @@ function init() { loadData(); render(); byId("q").focus(); }
         <label>Schlagworte (Komma-getrennt, f&uuml;r die Suche)</label>
         <input type="text" id="f_schlagworte" />
       </div>
-      <div class="row2">
+      <div class="row3">
         <div class="field"><label>Bauteilgruppe</label><input type="text" id="f_bauteilgruppe" /></div>
         <div class="field"><label>Hersteller</label><input type="text" id="f_hersteller" /></div>
+        <div class="field"><label>Zuordnung (Lieferant)</label><input type="text" id="f_zuordnung" /></div>
       </div>
       <div class="row3">
         <div class="field"><label>IstMenge (Bestand)</label><input type="number" id="f_istMenge" /></div>

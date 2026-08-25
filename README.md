@@ -23,6 +23,14 @@ Ersatzteilen. Keine Installation nötig – `Ersatzteildatenbank.hta` per Doppel
 - **Schlagwort- & Artikelnummer-Suche**: ein Suchfeld über Artikelnummer,
   Erweiterte Art.Nr, Bezeichnung, Schlagworte, Bauteilgruppe, Bin, Hersteller,
   Nachfolger und Position/Typ. Mehrere Begriffe = UND-verknüpft.
+- **Zuordnung (Lieferant)**: eigenes Feld/Spalte `Zuordnung` (z. B. Kardex,
+  Syncore, Mosca, Assa Abloy), durchsuchbar und unter der Artikel-Nr. sichtbar.
+- **Passwortschutz**: Bearbeiten, Löschen, Neu anlegen und CSV-Import sind
+  passwortgeschützt. Das Passwort wird im HTA-Kopf gesetzt
+  (`var ADMIN_PW = "1234";` – **bitte ändern**). Ein-/Ausbuchen und
+  Bestellt-Umschalten bleiben ohne Passwort möglich. Button oben rechts
+  entsperrt/sperrt die Sitzung.
+- **Angeheftete Kopfzeile**: die Spaltenüberschriften bleiben beim Scrollen oben.
 - Sortierung per Spaltenklick, CSV-Export/-Import.
 
 ## Datenmodell (an die Excel „Ersatzteilmatrix" angelehnt)
