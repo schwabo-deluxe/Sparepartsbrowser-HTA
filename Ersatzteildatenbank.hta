@@ -368,10 +368,26 @@ function stockClass(p) {
   return "ok";
 }
 
+// Zehnergruppen-Tokens der Plaetze (DA40.1 -> "DA4"), fuer Bereichssuche
+function placeGroups(platz) {
+  if (!platz) return "";
+  var codes = ("" + platz).split(/;\s*/), out = [];
+  for (var i=0;i<codes.length;i++) {
+    var m = trim(codes[i]).match(/^([A-Za-z]{2,3})(\d{2})/);
+    if (m) { var g = m[1] + m[2].charAt(0); if (out.join(" ").indexOf(g) < 0) out.push(g); }
+  }
+  return out.join(" ");
+}
+
 // ---- Filtern / Sortieren / Rendern ----
 function currentFiltered() {
   var q = trim(byId("q").value).toLowerCase();
   var terms = q.length ? q.split(/\s+/) : [];
+  // Platz-Basis wie "da40" -> Zehnergruppe "da4" (findet DA40..DA49)
+  for (var ti=0; ti<terms.length; ti++) {
+    var gm = terms[ti].match(/^([a-z]{2,3})(\d{2})$/);
+    if (gm) terms[ti] = gm[1] + gm[2].charAt(0);
+  }
   var stat = byId("fStatus").value;
   var onlyWarn = byId("fWarn").checked;
   var showHidden = byId("fHidden").checked;
@@ -387,7 +403,8 @@ function currentFiltered() {
     if (onlyIncomplete && !isIncomplete(p)) continue;
     if (terms.length) {
       var hay = (p.artikelnummer+" "+p.erwArtNr+" "+p.bezeichnung+" "+p.schlagworte+" "+
-                 p.bauteilgruppe+" "+p.bin+" "+p.hersteller+" "+p.zuordnung+" "+p.platz+" "+p.nachfolger+" "+p.posTyp).toLowerCase();
+                 p.bauteilgruppe+" "+p.bin+" "+p.hersteller+" "+p.zuordnung+" "+p.platz+" "+
+                 placeGroups(p.platz)+" "+p.nachfolger+" "+p.posTyp).toLowerCase();
       var ok = true;
       for (var t = 0; t < terms.length; t++) { if (hay.indexOf(terms[t]) < 0) { ok = false; break; } }
       if (!ok) continue;
